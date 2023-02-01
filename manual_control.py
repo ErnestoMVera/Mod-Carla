@@ -93,7 +93,7 @@ import math
 import random
 import re
 import weakref
-
+from Camaras.cam_man import CustomTimer, DisplayManager, SensorManager
 try:
     import pygame
     from pygame.locals import KMOD_CTRL

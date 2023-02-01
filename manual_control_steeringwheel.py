@@ -709,22 +709,22 @@ class CameraManager(object):
 
         self.transform_index = 1
         self.sensors = [
-            ['sensor.camera.rgb', cc.Raw, 'Camera RGB', {}],
-            ['sensor.camera.depth', cc.Raw, 'Camera Depth (Raw)', {}],
-            ['sensor.camera.depth', cc.Depth, 'Camera Depth (Gray Scale)', {}],
-            ['sensor.camera.depth', cc.LogarithmicDepth, 'Camera Depth (Logarithmic Gray Scale)', {}],
-            ['sensor.camera.semantic_segmentation', cc.Raw, 'Camera Semantic Segmentation (Raw)', {}],
-            ['sensor.camera.semantic_segmentation', cc.CityScapesPalette, 'Camera Semantic Segmentation (CityScapes Palette)', {}],
-            ['sensor.camera.instance_segmentation', cc.CityScapesPalette, 'Camera Instance Segmentation (CityScapes Palette)', {}],
-            ['sensor.camera.instance_segmentation', cc.Raw, 'Camera Instance Segmentation (Raw)', {}],
-            ['sensor.lidar.ray_cast', None, 'Lidar (Ray-Cast)', {'range': '50'}],
-            ['sensor.camera.dvs', cc.Raw, 'Dynamic Vision Sensor', {}],
-            ['sensor.camera.rgb', cc.Raw, 'Camera RGB Distorted',
-                {'lens_circle_multiplier': '3.0',
-                'lens_circle_falloff': '3.0',
-                'chromatic_aberration_intensity': '0.5',
-                'chromatic_aberration_offset': '0'}],
-            ['sensor.camera.optical_flow', cc.Raw, 'Optical Flow', {}],
+            ['sensor.camera.rgb', cc.Raw, 'Camera RGB', {}]
+            #['sensor.camera.depth', cc.Raw, 'Camera Depth (Raw)', {}],
+            #['sensor.camera.depth', cc.Depth, 'Camera Depth (Gray Scale)', {}],
+            #['sensor.camera.depth', cc.LogarithmicDepth, 'Camera Depth (Logarithmic Gray Scale)', {}],
+            #['sensor.camera.semantic_segmentation', cc.Raw, 'Camera Semantic Segmentation (Raw)', {}],
+            #['sensor.camera.semantic_segmentation', cc.CityScapesPalette, 'Camera Semantic Segmentation (CityScapes Palette)', {}],
+            #['sensor.camera.instance_segmentation', cc.CityScapesPalette, 'Camera Instance Segmentation (CityScapes Palette)', {}],
+            #['sensor.camera.instance_segmentation', cc.Raw, 'Camera Instance Segmentation (Raw)', {}],
+            #['sensor.lidar.ray_cast', None, 'Lidar (Ray-Cast)', {'range': '50'}],
+            #['sensor.camera.dvs', cc.Raw, 'Dynamic Vision Sensor', {}],
+            #['sensor.camera.rgb', cc.Raw, 'Camera RGB Distorted',
+            #    {'lens_circle_multiplier': '3.0',
+            #    'lens_circle_falloff': '3.0',
+            #    'chromatic_aberration_intensity': '0.5',
+            #    'chromatic_aberration_offset': '0'}],
+            #['sensor.camera.optical_flow', cc.Raw, 'Optical Flow', {}],
         ]
         world = self._parent.get_world()
         bp_library = world.get_blueprint_library()
