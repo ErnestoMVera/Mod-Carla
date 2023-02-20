@@ -215,7 +215,7 @@ class World(object):
         self._actor_filter = args.filter
         self._actor_generation = args.generation
         self._gamma = args.gamma
-        self.restart()
+        self.restart(args)
         self.world.on_tick(hud.on_world_tick)
         self.recording_enabled = False
         self.recording_start = 0
@@ -237,7 +237,7 @@ class World(object):
             carla.MapLayer.All
         ]
 
-    def restart(self):
+    def restart(self, args):
         self.player_max_speed = 1.589
         self.player_max_speed_fast = 3.713
         # Keep same camera config if the camera manager exists.
@@ -286,9 +286,17 @@ class World(object):
         self.lane_invasion_sensor = LaneInvasionSensor(self.player, self.hud)
         self.gnss_sensor = GnssSensor(self.player)
         self.imu_sensor = IMUSensor(self.player)
-        self.camera_manager = CameraManager(self.player, self.hud, self._gamma)
+        self.camera_manager = DisplayManager([2, 3], [args.width, args.height], self.player, self.hud)#, self._gamma)
         self.camera_manager.transform_index = cam_pos_index
         self.camera_manager.set_sensor(cam_index, notify=False)
+        SensorManager(self.world, self.camera_manager, 'RGBCamera', carla.Transform(carla.Location(x=0, z=2.4), carla.Rotation(yaw=+00)), 
+                self.camera_manager._parent, {'fov': 90.0}, display_pos=[0, 1], display_size = [5760, 1080])
+        SensorManager(self.world, self.camera_manager, 'RGBCamera', carla.Transform(carla.Location(x =-2, z= 2.4), carla.Rotation(yaw=-210)), 
+                self.camera_manager._parent, {'fov': 120.0}, display_pos=[0, 2], display_size = [360, 240])
+        SensorManager(self.world, self.camera_manager, 'RGBCamera', carla.Transform(carla.Location(x =-2, z = 2.4), carla.Rotation(yaw=210)), 
+                self.camera_manager._parent, {'fov': 120.0}, display_pos=[0, 0], display_size = [360, 240])
+        SensorManager(self.world, self.camera_manager, 'RGBCamera', carla.Transform(carla.Location(x = 0.2, z = 2.4), carla.Rotation(yaw=180)), 
+                self.camera_manager._parent, {}, display_pos=[1, 1], display_size = [960, 200])
         actor_type = get_actor_display_name(self.player)
         self.hud.notification(actor_type)
 
@@ -339,7 +347,8 @@ class World(object):
         self.hud.tick(self, clock)
 
     def render(self, display):
-        self.camera_manager.render(display)
+        #self.camera_manager.render(display)
+        self.camera_manager.render()
         self.hud.render(display)
 
     def destroy_sensors(self):
@@ -351,7 +360,7 @@ class World(object):
         if self.radar_sensor is not None:
             self.toggle_radar()
         sensors = [
-            self.camera_manager.sensor,
+            #self.camera_manager.sensor,
             self.collision_sensor.sensor,
             self.lane_invasion_sensor.sensor,
             self.gnss_sensor.sensor,
@@ -465,17 +474,17 @@ class KeyboardControl(object):
                     if pygame.key.get_mods() & KMOD_CTRL:
                         index_ctrl = 9
                     world.camera_manager.set_sensor(event.key - 1 - K_0 + index_ctrl)
-                elif event.key == K_r and not (pygame.key.get_mods() & KMOD_CTRL):
-                    world.camera_manager.toggle_recording()
-                elif event.key == K_r and (pygame.key.get_mods() & KMOD_CTRL):
-                    if (world.recording_enabled):
-                        client.stop_recorder()
-                        world.recording_enabled = False
-                        world.hud.notification("Recorder is OFF")
-                    else:
-                        client.start_recorder("manual_recording.rec")
-                        world.recording_enabled = True
-                        world.hud.notification("Recorder is ON")
+                #elif event.key == K_r and not (pygame.key.get_mods() & KMOD_CTRL):
+                    #world.camera_manager.toggle_recording()
+                #elif event.key == K_r and (pygame.key.get_mods() & KMOD_CTRL):
+                #    if (world.recording_enabled):
+                #        client.stop_recorder()
+                #        world.recording_enabled = False
+                #        world.hud.notification("Recorder is OFF")
+                #    else:
+                #        client.start_recorder("manual_recording.rec")
+                #        world.recording_enabled = True
+                #        world.hud.notification("Recorder is ON")
                 elif event.key == K_p and (pygame.key.get_mods() & KMOD_CTRL):
                     # stop recorder
                     client.stop_recorder()
@@ -1220,9 +1229,9 @@ def game_loop(args):
             print("WARNING: You are currently in asynchronous mode and could "
                   "experience some issues with the traffic simulation")
         # Cambio de atributos para que la pantalla sea de 1920x1080, esta relación puede ser editada para adecuarse a cualquier tamaño de pantalla
-        args.height = 1080
-        args.width = 1920
-        args.res='1920x1080'
+        args.height = 1024 
+        args.width = 2560
+        args.res='2560x1024'
         args.rolename='Omega'
         display = pygame.display.set_mode(
             (args.width, args.height),

@@ -32,7 +32,12 @@ class CustomTimer:
     def time(self):
         return self.timer()
 class DisplayManager:
-    def __init__(self, grid_size, window_size):
+    def __init__(self, grid_size, window_size, parent_actor, hud):#, gamma_correction):
+        self.hud = hud
+        self._parent = parent_actor
+        bound_x = 0.5 + self._parent.bounding_box.extent.x
+        bound_y = 0.5 + self._parent.bounding_box.extent.y
+        bound_z = 0.5 + self._parent.bounding_box.extent.z
         pygame.init()
         pygame.font.init()
         self.display = pygame.display.set_mode(window_size, pygame.HWSURFACE | pygame.DOUBLEBUF)
@@ -61,6 +66,8 @@ class DisplayManager:
 
     def add_sensor(self, sensor):
         self.sensor_list.append(sensor)
+    def set_sensor(self, sensor, notify):
+        return 1
 
     def get_sensor_list(self):
         return self.sensor_list
