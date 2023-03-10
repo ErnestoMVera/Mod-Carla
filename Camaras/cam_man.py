@@ -38,8 +38,8 @@ class DisplayManager:
         bound_x = 0.5 + self._parent.bounding_box.extent.x
         bound_y = 0.5 + self._parent.bounding_box.extent.y
         bound_z = 0.5 + self._parent.bounding_box.extent.z
-        pygame.init()
-        pygame.font.init()
+        #pygame.init()
+        #pygame.font.init()
         self.display = pygame.display.set_mode(window_size, pygame.HWSURFACE | pygame.DOUBLEBUF)
 
         self.grid_size = grid_size
@@ -54,12 +54,17 @@ class DisplayManager:
 
     def get_display_offset(self, gridPos):
         dis_size = self.get_display_size()
+        # izquierda
         if gridPos[0] == 0 and gridPos[1] == 0:
-            return [0, 600]
+            #return [, 2*dis_size[1]/3]#[3840, 600]
+            return [1010, 500]
+        # derecha
         elif gridPos[0] == 0 and gridPos[1] == 2:
-            return [1560, 600]
+            #return [3*dis_size[0]/4, 2*dis_size[1]/3]#
+            return [3840 - 245, 500]
+        # Retrovisor
         elif gridPos[0] == 1 and gridPos[1] == 1:
-            return [480, 36]
+            return [1920 - 960/2, 36]
         else:
             return [0, 0]
 
