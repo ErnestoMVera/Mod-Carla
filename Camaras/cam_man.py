@@ -57,7 +57,7 @@ class DisplayManager:
         # izquierda
         if gridPos[0] == 0 and gridPos[1] == 0:
             #return [, 2*dis_size[1]/3]#[3840, 600]
-            return [1010, 500]
+            return [800, 550]
         # derecha
         elif gridPos[0] == 0 and gridPos[1] == 2:
             #return [3*dis_size[0]/4, 2*dis_size[1]/3]#
@@ -177,9 +177,12 @@ class SensorManager:
         array = np.reshape(array, (image.height, image.width, 4))
         array = array[:, :, :3]
         array = array[:, :, ::-1]
-
+        shape = np.shape(array)
+        if(shape[0] < 720):
+            array = np.fliplr(array)
         if self.display_man.render_enabled():
             self.surface = pygame.surfarray.make_surface(array.swapaxes(0, 1))
+        
 
         t_end = self.timer.time()
         self.time_processing += (t_end-t_start)

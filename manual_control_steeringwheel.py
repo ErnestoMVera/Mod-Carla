@@ -94,6 +94,7 @@ try:
     from pygame.locals import K_r
     from pygame.locals import K_s
     from pygame.locals import K_w
+    from pygame.locals import K_b
 except ImportError:
     raise RuntimeError('cannot import pygame, make sure pygame package is installed')
 
@@ -137,8 +138,23 @@ class World(object):
         self._weather_presets = find_weather_presets()
         self._weather_index = 0
         self._actor_filter = actor_filter
+        self.current_map_layer = 0
+        self.map_layer_names = [
+            carla.MapLayer.NONE,
+            carla.MapLayer.Buildings,
+            carla.MapLayer.Decals,
+            carla.MapLayer.Foliage,
+            carla.MapLayer.Ground,
+            carla.MapLayer.ParkedVehicles,
+            carla.MapLayer.Particles,
+            carla.MapLayer.Props,
+            carla.MapLayer.StreetLights,
+            carla.MapLayer.Walls,
+            carla.MapLayer.All
+        ]
         self.restart(args)
         self.world.on_tick(hud.on_world_tick)
+        
         
 
     def restart(self, args):
@@ -176,7 +192,7 @@ class World(object):
         bound_z = 0.5 + self.player.bounding_box.extent.z
         Attachment = carla.AttachmentType
         SensorManager(self.world, self.camera_manager, 'RGBCamera', carla.Transform(carla.Location(x=-0.1*bound_x, y=-0.25*bound_y, z=0.95*bound_z)), 
-                self.camera_manager._parent, {'fov': 115.0}, display_pos=[0, 1], display_size = [args.width, args.height])
+                self.camera_manager._parent, {'fov': 100.0}, display_pos=[0, 1], display_size = [args.width, args.height])
         SensorManager(self.world, self.camera_manager, 'RGBCamera', carla.Transform(carla.Location(x=0.25*bound_x, y=0.75*bound_y, z=0.82*bound_z), carla.Rotation(yaw=-195)), 
                 self.camera_manager._parent, {'fov': 115.0}, display_pos=[0, 2], display_size = [240, 144])
         SensorManager(self.world, self.camera_manager, 'RGBCamera', carla.Transform(carla.Location(x=0.23*bound_x, y=-0.7*bound_y, z=0.82*bound_z), carla.Rotation(yaw=-196)), 
@@ -187,11 +203,32 @@ class World(object):
         #self.hud.notification(actor_type)
 
     def next_weather(self, reverse=False):
-        self._weather_index += -1 if reverse else 1
+        if reverse:
+            self._weather_index += -1
+        else:
+            self._weather_index += 1
         self._weather_index %= len(self._weather_presets)
         preset = self._weather_presets[self._weather_index]
         self.hud.notification('Weather: %s' % preset[1])
         self.player.get_world().set_weather(preset[0])
+
+    def load_map_layer(self, unload=False):
+        selected = self.map_layer_names[self.current_map_layer]
+        if unload:
+            self.hud.notification('Unloading map layer: %s' % self.current_map_layer)
+            self.world.unload_map_layer(selected)
+        else:
+            self.hud.notification('Loading map layer: %s' % self.current_map_layer)
+            self.world.load_map_layer(selected)
+
+    def next_map_layer(self, reverse=False):
+        if reverse:
+            self.current_map_layer += -1
+        else:
+            self.current_map_layer += 1
+        self.current_map_layer %= len(self.map_layer_names)
+        selected = self.map_layer_names[self.current_map_layer]
+        self.hud.notification('LayerMap selected: %s' % self.current_map_layer)
 
     def tick(self, clock):
         self.hud.tick(self, clock)
@@ -294,6 +331,10 @@ class DualControl(object):
                     world.camera_manager.set_sensor(event.key - 1 - K_0)
                 elif event.key == K_r:
                     world.camera_manager.toggle_recording()
+                elif event.key == K_b and pygame.key.get_mods() & KMOD_SHIFT:
+                    world.load_map_layer(unload=True)
+                elif event.key == K_b:
+                    world.load_map_layer()
                 if isinstance(self._control, carla.VehicleControl):
                     if event.key == K_q:
                         self._control.gear = 1 if self._control.reverse else -1
@@ -687,14 +728,20 @@ def game_loop(args):
 
     try:
         client = carla.Client(args.host, args.port)
-        client.set_timeout(2.0)
+        client.set_timeout(15.0)
 
         display = pygame.display.set_mode(
             (args.width, args.height),
             pygame.HWSURFACE | pygame.DOUBLEBUF)
 
         hud = HUD(args.width, args.height)
-        world = World(client.get_world(), hud, args.filter, args)
+        # Load layered map for Town 01 with minimum layout plus buildings and parked vehicles
+        CarlaWorld = client.load_world('Town03_Opt', carla.MapLayer.ParkedVehicles | carla.MapLayer.StreetLights)
+        # Toggle all buildings off
+        CarlaWorld.unload_map_layer(carla.MapLayer.Buildings)
+        CarlaWorld.unload_map_layer(carla.MapLayer.Foliage)
+        CarlaWorld.unload_map_layer(carla.MapLayer.Decals)
+        world = World(CarlaWorld, hud, args.filter, args)
         controller = DualControl(world, args.autopilot)
 
         clock = pygame.time.Clock()
