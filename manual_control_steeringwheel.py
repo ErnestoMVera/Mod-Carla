@@ -56,6 +56,7 @@ import math
 import random
 import re
 import weakref
+import socket
 from Camaras.cam_man import CustomTimer, DisplayManager, SensorManager
 if sys.version_info >= (3, 0):
 
@@ -182,7 +183,7 @@ class World(object):
             INICIO = 248
             self.player = self.world.try_spawn_actor(blueprint, spawn_points[INICIO])
         # Set up the sensors.
-        self.collision_sensor = CollisionSensor(self.player, self.hud)
+        self.collision_sensor = CollisionSensor(self.player, self.hud, args.RTPort)
         self.lane_invasion_sensor = LaneInvasionSensor(self.player, self.hud)
         self.gnss_sensor = GnssSensor(self.player)
         self.camera_manager = DisplayManager([2, 3], [args.width, args.height], self.player, self.hud)#, self._gamma)
@@ -636,7 +637,7 @@ class HelpText(object):
 # -- CollisionSensor -----------------------------------------------------------
 # ==============================================================================
 class CollisionSensor(object):
-    def __init__(self, parent_actor, hud):
+    def __init__(self, parent_actor, hud, RTPort):
         self.sensor = None
         self.history = []
         self._parent = parent_actor
@@ -644,10 +645,17 @@ class CollisionSensor(object):
         self.world = self._parent.get_world()
         bp = self.world.get_blueprint_library().find('sensor.other.gnss')
         self.sensor = self.world.spawn_actor(bp, carla.Transform(), attach_to=self._parent)
+        self.puntos = []
+        self.repetido = False
         # We need to pass the lambda a weak reference to self to avoid circular
         # reference.
         weak_self = weakref.ref(self)
         self.sensor.listen(lambda event: CollisionSensor._on_collision(weak_self, event))
+        if RTPort is not None:
+            self.socket_rt = socket.socket()
+            self.socket_rt.connect(('127.0.0.1', int(RTPort)))
+
+
 
     def get_collision_history(self):
         history = collections.defaultdict(int)
@@ -669,6 +677,12 @@ class CollisionSensor(object):
         #print(f"player x:{x}, player y: {y}")
         if (x < place1.x + offset and x > place1.x - offset) and (y < place1.y + offset and y > place1.y - offset):
             self.hud.notification("En el rango", seconds=0.5)
+            if not self.repetido:
+                self.socket_rt.sendall(bytes("RT", 'utf-8'))
+                self.repetido = True
+        else:
+            self.repetido = False
+
 
 
 # ==============================================================================
@@ -808,6 +822,11 @@ def main():
         metavar='PATTERN',
         default='vehicle.*',
         help='actor filter (default: "vehicle.*")')
+    argparser.add_argument(
+        '--RTPort',
+        metavar='RTPort',
+        default=None,
+        help='Especificar el puerto del servidor de la app de tiempo de reaccion\n si no se especifica puerto la deteccion de puntos esta apagada por defecto')
     args = argparser.parse_args()
 
     args.width, args.height = [int(x) for x in args.res.split('x')]
