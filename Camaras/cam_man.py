@@ -11,8 +11,6 @@ except IndexError:
     pass
 
 import carla
-import argparse
-import random
 import time
 import numpy as np
 
@@ -38,8 +36,6 @@ class DisplayManager:
         bound_x = 0.5 + self._parent.bounding_box.extent.x
         bound_y = 0.5 + self._parent.bounding_box.extent.y
         bound_z = 0.5 + self._parent.bounding_box.extent.z
-        #pygame.init()
-        #pygame.font.init()
         self.display = pygame.display.set_mode(window_size, pygame.HWSURFACE | pygame.DOUBLEBUF)
 
         self.grid_size = grid_size

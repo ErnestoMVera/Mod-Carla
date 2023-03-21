@@ -178,8 +178,9 @@ class World(object):
             self.player = self.world.try_spawn_actor(blueprint, spawn_point)
         while self.player is None:
             spawn_points = self.world.get_map().get_spawn_points()
-            spawn_point = random.choice(spawn_points) if spawn_points else carla.Transform()
-            self.player = self.world.try_spawn_actor(blueprint, spawn_point)
+            # El spawn point 248 es el inicio del recorrido
+            INICIO = 248
+            self.player = self.world.try_spawn_actor(blueprint, spawn_points[INICIO])
         # Set up the sensors.
         self.collision_sensor = CollisionSensor(self.player, self.hud)
         self.lane_invasion_sensor = LaneInvasionSensor(self.player, self.hud)
@@ -233,6 +234,12 @@ class World(object):
     def tick(self, clock):
         self.hud.tick(self, clock)
 
+    def generarWaypoints(self):
+        waypoints = self.world.get_map().get_spawn_points()
+        for (i,w) in enumerate(waypoints):
+            self.world.debug.draw_string(w.location, str(i), draw_shadow=False,
+                                       color=carla.Color(r=255, g=0, b=0), life_time=120.0,
+                                       persistent_lines=True)
     def render(self, display):
         #self.camera_manager.render(display)
         self.camera_manager.render()
@@ -634,9 +641,9 @@ class CollisionSensor(object):
         self.history = []
         self._parent = parent_actor
         self.hud = hud
-        world = self._parent.get_world()
-        bp = world.get_blueprint_library().find('sensor.other.collision')
-        self.sensor = world.spawn_actor(bp, carla.Transform(), attach_to=self._parent)
+        self.world = self._parent.get_world()
+        bp = self.world.get_blueprint_library().find('sensor.other.gnss')
+        self.sensor = self.world.spawn_actor(bp, carla.Transform(), attach_to=self._parent)
         # We need to pass the lambda a weak reference to self to avoid circular
         # reference.
         weak_self = weakref.ref(self)
@@ -653,13 +660,15 @@ class CollisionSensor(object):
         self = weak_self()
         if not self:
             return
-        actor_type = get_actor_display_name(event.other_actor)
-        #self.hud.notification('Collision with %r' % actor_type)
-        impulse = event.normal_impulse
-        intensity = math.sqrt(impulse.x**2 + impulse.y**2 + impulse.z**2)
-        self.history.append((event.frame, intensity))
-        if len(self.history) > 4000:
-            self.history.pop(0)
+        # Agarrar la x y y del jugador, la z no porque es la altura
+        x, y = event.transform.location.x, event.transform.location.y 
+        offset = 5
+        spawns = self.world.get_map().get_spawn_points()
+        place1 = spawns[214].location
+        #print(f"location x:{place1.x}, location y: {place1.y}")
+        #print(f"player x:{x}, player y: {y}")
+        if (x < place1.x + offset and x > place1.x - offset) and (y < place1.y + offset and y > place1.y - offset):
+            self.hud.notification("En el rango", seconds=0.5)
 
 
 # ==============================================================================
@@ -743,7 +752,7 @@ def game_loop(args):
         CarlaWorld.unload_map_layer(carla.MapLayer.Decals)
         world = World(CarlaWorld, hud, args.filter, args)
         controller = DualControl(world, args.autopilot)
-
+        #world.generarWaypoints()
         clock = pygame.time.Clock()
         while True:
             clock.tick_busy_loop(60)
