@@ -636,23 +636,34 @@ class HelpText(object):
 # ==============================================================================
 # -- CollisionSensor -----------------------------------------------------------
 # ==============================================================================
+class RTWaypoint(object):
+    def __init__(self, location, category):
+        self.location = location
+        self.category = category
+        self.repetido = False
 class CollisionSensor(object):
     def __init__(self, parent_actor, hud, RTPort):
         self.sensor = None
         self.history = []
         self._parent = parent_actor
         self.hud = hud
+        self.offset = 5
         self.world = self._parent.get_world()
         bp = self.world.get_blueprint_library().find('sensor.other.gnss')
         self.sensor = self.world.spawn_actor(bp, carla.Transform(), attach_to=self._parent)
         self.puntos = []
         self.repetido = False
+        spawns = self.world.get_map().get_spawn_points()
+        place1 = spawns[214].location
+        place2 = spawns[235].location
+        self.waypoints = {RTWaypoint(place1, "lt"), RTWaypoint(place2, "rt")}
         # We need to pass the lambda a weak reference to self to avoid circular
         # reference.
         weak_self = weakref.ref(self)
         self.sensor.listen(lambda event: CollisionSensor._on_collision(weak_self, event))
         if RTPort is not None:
             self.socket_rt = socket.socket()
+            #self.socket_rt.connect(('148.231.81.116', int(RTPort)))
             self.socket_rt.connect(('127.0.0.1', int(RTPort)))
 
 
@@ -669,19 +680,16 @@ class CollisionSensor(object):
         if not self:
             return
         # Agarrar la x y y del jugador, la z no porque es la altura
-        x, y = event.transform.location.x, event.transform.location.y 
-        offset = 5
-        spawns = self.world.get_map().get_spawn_points()
-        place1 = spawns[214].location
-        #print(f"location x:{place1.x}, location y: {place1.y}")
-        #print(f"player x:{x}, player y: {y}")
-        if (x < place1.x + offset and x > place1.x - offset) and (y < place1.y + offset and y > place1.y - offset):
-            self.hud.notification("En el rango", seconds=0.5)
-            if not self.repetido:
-                self.socket_rt.sendall(bytes("RT", 'utf-8'))
-                self.repetido = True
-        else:
-            self.repetido = False
+        x, y = event.transform.location.x, event.transform.location.y
+        for waypoint in self.waypoints:
+            place = waypoint.location 
+            if (x < place.x + self.offset and x > place.x - self.offset) and (y < place.y + self.offset and y > place.y - self.offset):
+                self.hud.notification("En el rango", seconds=0.5)
+                if not waypoint.repetido:
+                    self.socket_rt.sendall(bytes(waypoint.category, 'utf-8'))
+                    waypoint.repetido = True
+            else:
+                waypoint.repetido = False
 
 
 
@@ -751,7 +759,7 @@ def game_loop(args):
 
     try:
         client = carla.Client(args.host, args.port)
-        client.set_timeout(15.0)
+        client.set_timeout(25.0)
 
         display = pygame.display.set_mode(
             (args.width, args.height),
