@@ -29,7 +29,7 @@ from __future__ import print_function
 import glob
 import os
 import sys
-
+from os.path import exists
 try:
     sys.path.append(glob.glob('../carla/dist/carla-*%d.%d-%s.egg' % (
         sys.version_info.major,
@@ -57,6 +57,8 @@ import random
 import re
 import weakref
 import socket
+import csv
+import time
 from Camaras.cam_man import CustomTimer, DisplayManager, SensorManager
 if sys.version_info >= (3, 0):
 
@@ -88,6 +90,7 @@ try:
     from pygame.locals import K_a
     from pygame.locals import K_c
     from pygame.locals import K_d
+    from pygame.locals import K_g
     from pygame.locals import K_h
     from pygame.locals import K_m
     from pygame.locals import K_p
@@ -96,6 +99,7 @@ try:
     from pygame.locals import K_s
     from pygame.locals import K_w
     from pygame.locals import K_b
+    from pygame.locals import K_t
 except ImportError:
     raise RuntimeError('cannot import pygame, make sure pygame package is installed')
 
@@ -132,8 +136,8 @@ class World(object):
         self.world = carla_world
         self.hud = hud
         self.player = None
-        self.collision_sensor = None
-        self.lane_invasion_sensor = None
+        self.position_sensor = None
+        self.vehicle_vars_sensor = None
         self.gnss_sensor = None
         self.camera_manager = None
         self._weather_presets = find_weather_presets()
@@ -155,7 +159,6 @@ class World(object):
         ]
         self.restart(args)
         self.world.on_tick(hud.on_world_tick)
-        
         
 
     def restart(self, args):
@@ -183,8 +186,8 @@ class World(object):
             INICIO = 248
             self.player = self.world.try_spawn_actor(blueprint, spawn_points[INICIO])
         # Set up the sensors.
-        self.collision_sensor = CollisionSensor(self.player, self.hud, args.RTPort)
-        self.lane_invasion_sensor = LaneInvasionSensor(self.player, self.hud)
+        self.position_sensor = PositionSensor(self.player, self.hud, args.RTPort)
+        self.vehicle_vars_sensor = VehicleVarsSensor(self.player, self.hud, int(args.nSujeto))
         self.gnss_sensor = GnssSensor(self.player)
         self.camera_manager = DisplayManager([2, 3], [args.width, args.height], self.player, self.hud)#, self._gamma)
         self.camera_manager.transform_index = cam_pos_index
@@ -199,6 +202,7 @@ class World(object):
                 self.camera_manager._parent, {'fov': 115.0}, display_pos=[0, 2], display_size = [240, 144])
         SensorManager(self.world, self.camera_manager, 'RGBCamera', carla.Transform(carla.Location(x=0.23*bound_x, y=-0.7*bound_y, z=0.82*bound_z), carla.Rotation(yaw=-196)), 
                 self.camera_manager._parent, {'fov': 115.0}, display_pos=[0, 0], display_size = [240, 144])
+        # RETROVISOR, DESACTIVADO DE MOMENTO
         #SensorManager(self.world, self.camera_manager, 'RGBCamera', carla.Transform(carla.Location(x = 0.2, z = 2.4), carla.Rotation(yaw=180)), 
         #        self.camera_manager._parent, {}, display_pos=[1, 1], display_size = [960, 150])
         #actor_type = get_actor_display_name(self.player)
@@ -234,6 +238,7 @@ class World(object):
 
     def tick(self, clock):
         self.hud.tick(self, clock)
+        self.vehicle_vars_sensor.on_tick(self)
 
     def generarWaypoints(self):
         waypoints = self.world.get_map().get_spawn_points()
@@ -242,15 +247,14 @@ class World(object):
                                        color=carla.Color(r=255, g=0, b=0), life_time=120.0,
                                        persistent_lines=True)
     def render(self, display):
-        #self.camera_manager.render(display)
         self.camera_manager.render()
         self.hud.render(display)
 
     def destroy(self):
+        self.vehicle_vars_sensor.destroy()
         sensors = [
             #self.camera_manager.sensor,
-            self.collision_sensor.sensor,
-            self.lane_invasion_sensor.sensor,
+            self.position_sensor.sensor,
             self.gnss_sensor.sensor]
         for sensor in sensors:
             if sensor is not None:
@@ -341,8 +345,6 @@ class DualControl(object):
                     world.camera_manager.toggle_recording()
                 elif event.key == K_b and pygame.key.get_mods() & KMOD_SHIFT:
                     world.load_map_layer(unload=True)
-                elif event.key == K_b:
-                    world.load_map_layer()
                 if isinstance(self._control, carla.VehicleControl):
                     if event.key == K_q:
                         self._control.gear = 1 if self._control.reverse else -1
@@ -359,7 +361,51 @@ class DualControl(object):
                         self._autopilot_enabled = not self._autopilot_enabled
                         world.player.set_autopilot(self._autopilot_enabled)
                         world.hud.notification('Autopilot %s' % ('On' if self._autopilot_enabled else 'Off'))
-
+                    elif event.key == K_g:
+                        nombre_archivo = f'metadata/puntos_guardados.csv'
+                        writer = None
+                        if(not exists(nombre_archivo)):
+                            file = open(nombre_archivo, 'w')
+                            writer = csv.writer(file)
+                            row = ["X","Y","Z","loc"]
+                            writer.writerow(row)
+                        else:
+                            file = open(nombre_archivo, 'a')
+                            writer = csv.writer(file)
+                        loc = world.player.get_location()
+                        row = [loc.x, loc.y, loc.z,"si"]
+                        writer.writerow(row)
+                        file.close()
+                    elif event.key == K_b:
+                        nombre_archivo = f'metadata/puntos_guardados.csv'
+                        writer = None
+                        if(not exists(nombre_archivo)):
+                            file = open(nombre_archivo, 'w')
+                            writer = csv.writer(file)
+                            row = ["X","Y","Z","loc"]
+                            writer.writerow(row)
+                        else:
+                            file = open(nombre_archivo, 'a')
+                            writer = csv.writer(file)
+                        loc = world.player.get_location()
+                        row = [loc.x, loc.y, loc.z,"lt"]
+                        writer.writerow(row)
+                        file.close()
+                    elif event.key == K_t:
+                        nombre_archivo = f'metadata/puntos_guardados.csv'
+                        writer = None
+                        if(not exists(nombre_archivo)):
+                            file = open(nombre_archivo, 'w')
+                            writer = csv.writer(file)
+                            row = ["X","Y","Z","loc"]
+                            writer.writerow(row)
+                        else:
+                            file = open(nombre_archivo, 'a')
+                            writer = csv.writer(file)
+                        loc = world.player.get_location()
+                        row = [loc.x, loc.y, loc.z,"rt"]
+                        writer.writerow(row)
+                        file.close()
         if not self._autopilot_enabled:
             if isinstance(self._control, carla.VehicleControl):
                 self._parse_vehicle_keys(pygame.key.get_pressed(), clock.get_time())
@@ -480,10 +526,6 @@ class HUD(object):
         heading += 'S' if abs(t.rotation.yaw) > 90.5 else ''
         heading += 'E' if 179.5 > t.rotation.yaw > 0.5 else ''
         heading += 'W' if -0.5 > t.rotation.yaw > -179.5 else ''
-        colhist = world.collision_sensor.get_collision_history()
-        collision = [colhist[x + self.frame - 200] for x in range(0, 200)]
-        max_col = max(1.0, max(collision))
-        collision = [x / max_col for x in collision]
         vehicles = world.world.get_actors().filter('vehicle.*')
         self._info_text = [
             'Server:  % 16.0f FPS' % self.server_fps,
@@ -514,8 +556,6 @@ class HUD(object):
                 ('Jump:', c.jump)]
         self._info_text += [
             '',
-            'Collision:',
-            collision,
             '',
             'Number of vehicles: % 8d' % len(vehicles)]
         if len(vehicles) > 1:
@@ -579,8 +619,6 @@ class HUD(object):
 # ==============================================================================
 # -- FadingText ----------------------------------------------------------------
 # ==============================================================================
-
-
 class FadingText(object):
     def __init__(self, font, dim, pos):
         self.font = font
@@ -634,17 +672,18 @@ class HelpText(object):
 
 
 # ==============================================================================
-# -- CollisionSensor -----------------------------------------------------------
+# -- POSITIONSENSOR -----------------------------------------------------------
 # ==============================================================================
 class RTWaypoint(object):
     def __init__(self, location, category):
         self.location = location
         self.category = category
         self.repetido = False
-class CollisionSensor(object):
+class PositionSensor(object):
     def __init__(self, parent_actor, hud, RTPort):
         self.sensor = None
         self.history = []
+        self.RTPort = RTPort
         self._parent = parent_actor
         self.hud = hud
         self.offset = 5
@@ -654,37 +693,41 @@ class CollisionSensor(object):
         self.puntos = []
         self.repetido = False
         spawns = self.world.get_map().get_spawn_points()
-        place1 = spawns[214].location
-        place2 = spawns[235].location
-        self.waypoints = {RTWaypoint(place1, "lt"), RTWaypoint(place2, "rt")}
+        # LEER WAYPOINTS DEL CSV METADATA/puntos_guardados
+        self.waypoints = self.leer_puntos()
         # We need to pass the lambda a weak reference to self to avoid circular
         # reference.
         weak_self = weakref.ref(self)
-        self.sensor.listen(lambda event: CollisionSensor._on_collision(weak_self, event))
+        self.sensor.listen(lambda event: PositionSensor._on_collision(weak_self, event))
         if RTPort is not None:
             self.socket_rt = socket.socket()
-            #self.socket_rt.connect(('148.231.81.116', int(RTPort)))
             self.socket_rt.connect(('127.0.0.1', int(RTPort)))
 
-
-
-    def get_collision_history(self):
-        history = collections.defaultdict(int)
-        for frame, intensity in self.history:
-            history[frame] += intensity
-        return history
+    def leer_puntos(self):
+        if not exists("metadata/puntos_guardados.csv"):
+            return [RTWaypoint(carla.Location(0, 0, 0), "lt")]
+        waypoints = [];
+        with open("metadata/puntos_guardados.csv", "r") as file:
+            csvreader = csv.reader(file)
+            for row in csvreader:
+                if row[0] == "X": # SKIP HEADER
+                    continue
+                location = carla.Location(float(row[0]), float(row[1]), float(row[2]))
+                waypoints.append(RTWaypoint(location, row[3]))
+        return waypoints
 
     @staticmethod
     def _on_collision(weak_self, event):
         self = weak_self()
         if not self:
             return
+        if self.RTPort is None:
+            return
         # Agarrar la x y y del jugador, la z no porque es la altura
         x, y = event.transform.location.x, event.transform.location.y
         for waypoint in self.waypoints:
             place = waypoint.location 
             if (x < place.x + self.offset and x > place.x - self.offset) and (y < place.y + self.offset and y > place.y - self.offset):
-                self.hud.notification("En el rango", seconds=0.5)
                 if not waypoint.repetido:
                     self.socket_rt.sendall(bytes(waypoint.category, 'utf-8'))
                     waypoint.repetido = True
@@ -694,31 +737,42 @@ class CollisionSensor(object):
 
 
 # ==============================================================================
-# -- LaneInvasionSensor --------------------------------------------------------
+# -- Vehicule Variables Sensor --------------------------------------------------------
 # ==============================================================================
-
-
-class LaneInvasionSensor(object):
-    def __init__(self, parent_actor, hud):
+class VehicleVarsSensor(object):
+    def __init__(self, parent_actor, hud, n_sujeto):
         self.sensor = None
         self._parent = parent_actor
         self.hud = hud
-        world = self._parent.get_world()
-        bp = world.get_blueprint_library().find('sensor.other.lane_invasion')
-        self.sensor = world.spawn_actor(bp, carla.Transform(), attach_to=self._parent)
-        # We need to pass the lambda a weak reference to self to avoid circular
-        # reference.
-        weak_self = weakref.ref(self)
-        self.sensor.listen(lambda event: LaneInvasionSensor._on_invasion(weak_self, event))
+        nombre_archivo = f'sesiones/sesion_sujeto{n_sujeto}.csv'
+        if(exists(nombre_archivo)):
+            raise Exception("El archivo para este sujeto ya existe")
+        self.file = open(nombre_archivo, 'w')
+        self.writer = csv.writer(self.file)
+        # HEADER DEL CSV
+        row = ["Timestamp","velocidad","steering","braking","throttle"]
+        self.writer.writerow(row)
 
-    @staticmethod
-    def _on_invasion(weak_self, event):
-        self = weak_self()
-        if not self:
-            return
-        lane_types = set(x.type for x in event.crossed_lane_markings)
-        text = ['%r' % str(x).split()[-1] for x in lane_types]
-        #self.hud.notification('Crossed line %s' % ' and '.join(text))
+    def on_tick(self, world):
+        t = world.player.get_transform()
+        v = world.player.get_velocity()
+        c = world.player.get_control()
+        # Timestamp
+        ts = time.time()
+        # Velocidad en km/h
+        velocidad = 3.6 * math.sqrt(v.x**2 + v.y**2 + v.z**2)
+        # steering
+        steering = c.steer
+        # braking
+        brake = c.brake
+        # accelarator / throttle
+        throttle = c.throttle
+        row = [ts,velocidad,steering,brake,throttle]
+        self.writer.writerow(row)
+    
+    def destroy(self):
+        self.file.close()
+
 
 # ==============================================================================
 # -- GnssSensor --------------------------------------------------------
@@ -767,7 +821,7 @@ def game_loop(args):
 
         hud = HUD(args.width, args.height)
         # Load layered map for Town 01 with minimum layout plus buildings and parked vehicles
-        CarlaWorld = client.load_world('Town03_Opt', carla.MapLayer.ParkedVehicles | carla.MapLayer.StreetLights)
+        CarlaWorld = client.load_world('Town05_Opt', carla.MapLayer.ParkedVehicles | carla.MapLayer.StreetLights)
         # Toggle all buildings off
         CarlaWorld.unload_map_layer(carla.MapLayer.Buildings)
         CarlaWorld.unload_map_layer(carla.MapLayer.Foliage)
@@ -835,6 +889,11 @@ def main():
         metavar='RTPort',
         default=None,
         help='Especificar el puerto del servidor de la app de tiempo de reaccion\n si no se especifica puerto la deteccion de puntos esta apagada por defecto')
+    argparser.add_argument(
+        '--nSujeto',
+        metavar='nSujeto',
+        default=0,
+        help='El numero de sujeto que esta completando la sesion')
     args = argparser.parse_args()
 
     args.width, args.height = [int(x) for x in args.res.split('x')]
