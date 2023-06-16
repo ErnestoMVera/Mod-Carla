@@ -175,6 +175,7 @@ class World(object):
         # Spawn the player.
         if self.player is not None:
             spawn_point = self.player.get_transform()
+            
             spawn_point.location.z += 2.0
             spawn_point.rotation.roll = 0.0
             spawn_point.rotation.pitch = 0.0
@@ -183,8 +184,11 @@ class World(object):
         while self.player is None:
             spawn_points = self.world.get_map().get_spawn_points()
             # El spawn point 248 es el inicio del recorrido
-            INICIO = 248
-            self.player = self.world.try_spawn_actor(blueprint, spawn_points[INICIO])
+            sp = spawn_points[0]
+            sp.rotation.yaw = sp.rotation.yaw - 90
+            sp.location = carla.Location(47.08653641, 89.11737061, 0.001696186)
+            sp.location.z += 2.0
+            self.player = self.world.try_spawn_actor(blueprint, sp)
         # Set up the sensors.
         self.position_sensor = PositionSensor(self.player, self.hud, args.RTPort)
         self.vehicle_vars_sensor = VehicleVarsSensor(self.player, self.hud, int(args.nSujeto))
@@ -365,12 +369,12 @@ class DualControl(object):
                         nombre_archivo = f'metadata/puntos_guardados.csv'
                         writer = None
                         if(not exists(nombre_archivo)):
-                            file = open(nombre_archivo, 'w')
+                            file = open(nombre_archivo, 'w', newline = '')
                             writer = csv.writer(file)
                             row = ["X","Y","Z","loc"]
                             writer.writerow(row)
                         else:
-                            file = open(nombre_archivo, 'a')
+                            file = open(nombre_archivo, 'a', newline = '')
                             writer = csv.writer(file)
                         loc = world.player.get_location()
                         row = [loc.x, loc.y, loc.z,"si"]
@@ -380,12 +384,12 @@ class DualControl(object):
                         nombre_archivo = f'metadata/puntos_guardados.csv'
                         writer = None
                         if(not exists(nombre_archivo)):
-                            file = open(nombre_archivo, 'w')
+                            file = open(nombre_archivo, 'w', newline = '')
                             writer = csv.writer(file)
                             row = ["X","Y","Z","loc"]
                             writer.writerow(row)
                         else:
-                            file = open(nombre_archivo, 'a')
+                            file = open(nombre_archivo, 'a', newline = '')
                             writer = csv.writer(file)
                         loc = world.player.get_location()
                         row = [loc.x, loc.y, loc.z,"lt"]
@@ -395,12 +399,12 @@ class DualControl(object):
                         nombre_archivo = f'metadata/puntos_guardados.csv'
                         writer = None
                         if(not exists(nombre_archivo)):
-                            file = open(nombre_archivo, 'w')
+                            file = open(nombre_archivo, 'w', newline = '')
                             writer = csv.writer(file)
                             row = ["X","Y","Z","loc"]
                             writer.writerow(row)
                         else:
-                            file = open(nombre_archivo, 'a')
+                            file = open(nombre_archivo, 'a', newline = '')
                             writer = csv.writer(file)
                         loc = world.player.get_location()
                         row = [loc.x, loc.y, loc.z,"rt"]
@@ -710,6 +714,7 @@ class PositionSensor(object):
         with open("metadata/puntos_guardados.csv", "r") as file:
             csvreader = csv.reader(file)
             for row in csvreader:
+                print(len(row))
                 if row[0] == "X": # SKIP HEADER
                     continue
                 location = carla.Location(float(row[0]), float(row[1]), float(row[2]))
@@ -747,16 +752,17 @@ class VehicleVarsSensor(object):
         nombre_archivo = f'sesiones/sesion_sujeto{n_sujeto}.csv'
         if(exists(nombre_archivo)):
             raise Exception("El archivo para este sujeto ya existe")
-        self.file = open(nombre_archivo, 'w')
+        self.file = open(nombre_archivo, 'w', newline = '')
         self.writer = csv.writer(self.file)
         # HEADER DEL CSV
-        row = ["Timestamp","velocidad","steering","braking","throttle"]
+        row = ["Timestamp","velocidad","steering","braking","throttle", "positionX", "positionY", "positionZ"]
         self.writer.writerow(row)
 
     def on_tick(self, world):
         t = world.player.get_transform()
         v = world.player.get_velocity()
         c = world.player.get_control()
+        loc = world.player.get_location()
         # Timestamp
         ts = time.time()
         # Velocidad en km/h
@@ -767,7 +773,9 @@ class VehicleVarsSensor(object):
         brake = c.brake
         # accelarator / throttle
         throttle = c.throttle
-        row = [ts,velocidad,steering,brake,throttle]
+        # location of the player
+        x_loc, y_loc, z_loc = loc.x, loc.y, loc.z
+        row = [ts,velocidad,steering,brake,throttle, x_loc, y_loc, z_loc]
         self.writer.writerow(row)
     
     def destroy(self):
