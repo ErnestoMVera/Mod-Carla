@@ -190,8 +190,12 @@ class World(object):
             sp.location.z += 2.0
             self.player = self.world.try_spawn_actor(blueprint, sp)
         # Set up the sensors.
+        if args.RTPort != None:
+            nombre_archivo = f'sesiones/sesion_sujeto{args.nSujeto}.csv'
+        else:
+            nombre_archivo = f'fam/sesion_sujeto{args.nSujeto}.csv'
         self.position_sensor = PositionSensor(self.player, self.hud, args.RTPort)
-        self.vehicle_vars_sensor = VehicleVarsSensor(self.player, self.hud, int(args.nSujeto))
+        self.vehicle_vars_sensor = VehicleVarsSensor(self.player, self.hud, int(args.nSujeto), nombre_archivo)
         self.gnss_sensor = GnssSensor(self.player)
         self.camera_manager = DisplayManager([2, 3], [args.width, args.height], self.player, self.hud)#, self._gamma)
         self.camera_manager.transform_index = cam_pos_index
@@ -745,11 +749,10 @@ class PositionSensor(object):
 # -- Vehicule Variables Sensor --------------------------------------------------------
 # ==============================================================================
 class VehicleVarsSensor(object):
-    def __init__(self, parent_actor, hud, n_sujeto):
+    def __init__(self, parent_actor, hud, n_sujeto, nombre_archivo):
         self.sensor = None
         self._parent = parent_actor
         self.hud = hud
-        nombre_archivo = f'sesiones/sesion_sujeto{n_sujeto}.csv'
         if(exists(nombre_archivo)):
             raise Exception("El archivo para este sujeto ya existe")
         self.file = open(nombre_archivo, 'w', newline = '')
